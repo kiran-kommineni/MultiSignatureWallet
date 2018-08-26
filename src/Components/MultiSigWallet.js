@@ -1,9 +1,7 @@
 import "bootstrap/dist/css/bootstrap.min.css"
 import React, { Component } from 'react'
 import MultiSigContract from '../contracts/MultiSigContract.json'
-//import MultiSigContract from './MultiSigContract.json'
 
-//import getWeb3 from '../utils/getWeb3'
 class MultiSigWallet extends Component{
     constructor(props) {
         super(props);
@@ -14,7 +12,7 @@ class MultiSigWallet extends Component{
           openProposalList: [],
           closedProposalList: [],
           web3: null,
-          title:"testing",
+          title:"MultiSignatureWallet",
           contributionstab: "block",
           proposalstab: "block"
         };

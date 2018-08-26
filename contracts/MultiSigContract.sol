@@ -197,7 +197,7 @@ contract MultiSigContract {
         }
         
         for(uint i = 0; i < proposals.length; i++) {
-            Proposal p = proposals[i];
+            Proposal storage p = proposals[i];
             address[] memory openBeneficiariesActual = new address[](j);
             for(i = 0;i<j;i++){
                 openBeneficiariesActual[i] = openBeneficiaries[i];
