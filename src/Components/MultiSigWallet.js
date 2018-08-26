@@ -1,5 +1,8 @@
+import "bootstrap/dist/css/bootstrap.min.css"
 import React, { Component } from 'react'
-  import MultiSigContract from '../contracts/MultiSigContract.json'
+import MultiSigContract from '../contracts/MultiSigContract.json'
+//import MultiSigContract from './MultiSigContract.json'
+
 //import getWeb3 from '../utils/getWeb3'
 class MultiSigWallet extends Component{
     constructor(props) {
@@ -11,7 +14,9 @@ class MultiSigWallet extends Component{
           openProposalList: [],
           closedProposalList: [],
           web3: null,
-          title:"testing"
+          title:"testing",
+          contributionstab: "block",
+          proposalstab: "block"
         };
 
         this.addContributor = this.addContributor.bind(this);
@@ -23,6 +28,7 @@ class MultiSigWallet extends Component{
         this.displayProposals = this.displayProposals.bind(this);
         this.approveProposal = this.approveProposal.bind(this);
         this.rejectProposal = this.rejectProposal.bind(this);
+        //this.txReceipt = this.txReceipt.bind(this);
       }
 
       componentWillMount() {
@@ -37,6 +43,32 @@ class MultiSigWallet extends Component{
         this.displayContributors(this.displayProposals);
       }
 
+      getTransactionReceiptMined(txHash, interval) {
+        const self = this;
+        const transactionReceiptAsync = function(resolve, reject) {
+            self.getTransactionReceipt(txHash, (error, receipt) => {
+                if (error) {
+                    reject(error);
+                } else if (receipt == null) {
+                    setTimeout(
+                        () => transactionReceiptAsync(resolve, reject),
+                        interval ? interval : 500);
+                } else {
+                    resolve(receipt);
+                }
+            });
+        };
+    
+        if (Array.isArray(txHash)) {
+            return Promise.all(txHash.map(
+                oneTxHash => self.getTransactionReceiptMined(oneTxHash, interval)));
+        } else if (typeof txHash === "string") {
+            return new Promise(transactionReceiptAsync);
+        } else {
+            throw new Error("Invalid Type: " + txHash);
+        }
+    }
+
 
       addContributor(){
         console.log("Inside Add contributor");
@@ -47,17 +79,23 @@ class MultiSigWallet extends Component{
         // Display Details
         this.state.web3.eth.getAccounts((error, accounts) => {
           signatureWallet.deployed().then( (instance) => {
+
+            console.log("add contributor - send Transaction");
              return instance.sendTransaction({
                 from: accounts[0],
-                value: this.state.web3.toWei(this.refs.etherValue.value, "ether")
-                                            }).then((result) => {
-                                                console.log("transResult", result);
-                                            });
+                value: this.state.web3.toWei(this.refs.etherValue.value, "ether")});
+            }).then((txHash) => {
+              console.log("add contributor - Transaction Receipt", txHash);
+              this.state.web3.eth.getTransactionReceipt(txHash, (result) => {
+                console.log("transreceipt", result);
+                this.displayDetails();
+                return result;
+              });
             }).then((result) => {
-              console.log("result" + result);
-              this.displayContributors();
+              this.displayDetails();
+              console.log("result contributor - result:", result);
             }).catch((error) => {
-                console.log("error getting data" + error);
+                console.log("Error adding contributor amount", error);  
             });
         });
       }
@@ -127,30 +165,40 @@ class MultiSigWallet extends Component{
         signatureWallet.deployed().then( (instance) => {
           signatureWalletInstance = instance;
           //get list of contributors
-          return signatureWalletInstance.getProposalAddressList.call()        })
+          return signatureWalletInstance.getProposalAddressList.call()})
         .then((result) => {
           openProposalList = result[0];
 
           let queue = Promise.resolve();
           openProposalList.forEach((proposerAddr) => {
+            if(proposerAddr == '0x0000000000000000000000000000000000000000'){
+              return;
+            }
             queue = queue.then((result) => {
               console.log('result: ', result);
               if (result) {
-                openProposerDetails.push({address: result[0], ether: web3Instance.fromWei(result[1].toNumber(), 'ether'), approveCount: result[2].toString(), rejectCount: result[3].toString()});
+                openProposerDetails.push({address: result[0], ether: web3Instance.fromWei(result[1].toNumber(), 'ether'), approveCount: result[2].toString(), rejectCount: result[3].toString(), availableEther: web3Instance.fromWei(result[4].toNumber(), 'ether')});
               }
               return signatureWalletInstance.getProposalDetails.call(proposerAddr);
             });
+
+            queue.then((result1) => {
+              if (result1) {
+                openProposerDetails.push({address: result1[0], ether: web3Instance.fromWei(result1[1].toNumber(), 'ether'), approveCount: result1[2].toString(), rejectCount: result1[3].toString(), availableEther: web3Instance.fromWei(result1[4].toNumber(), 'ether')});
+              }
+            });
+
           });
 
-          queue.then((result) => {
-            if (result) {
-              openProposerDetails.push({address: result[0], ether: web3Instance.fromWei(result[1].toNumber(), 'ether'), approveCount: result[2].toString(), rejectCount: result[3].toString()});
-            }
-          });
+
 
           closedProposalList = result[1];
 
           closedProposalList.forEach((proposerAddr) => {
+            console.log("closed proposals:", proposerAddr);
+            if(proposerAddr == '0x0000000000000000000000000000000000000000'){
+              return;
+            }
             queue = queue.then((result) => {
               console.log('result: ', result);
               if (result) {
@@ -158,6 +206,7 @@ class MultiSigWallet extends Component{
               }
               return signatureWalletInstance.getProposalDetails.call(proposerAddr);
             });
+
           });
 
           queue.then((result) => {
@@ -242,7 +291,8 @@ class MultiSigWallet extends Component{
 
       }
 
-      submitProposal(value){
+      /*
+      submitProposal1(value){
  
         console.log("Inside Submit Proposal", value);
         const contract = require('truffle-contract')
@@ -251,27 +301,51 @@ class MultiSigWallet extends Component{
 
         // Call End Contibution
         this.state.web3.eth.getAccounts((error, accounts) => {
-          //Increase the default gas
+          signatureWallet.deployed().then( (instance) => { 
+            console.log("value in wei", value);    
+             //return instance.submitProposal(this.state.web3.toWei(value, 'ether'));
+             return instance.sendTransaction({
+              from: accounts[0],
+              data: instance.submitProposal(this.state.web3.toWei(value, 'ether')),
+              gas: 4712388,
+              gasPrice: 100000000000,
+              value:
+            });
+          }).then((result) => {
+            console.log("completed proposal");
+            this.displayDetails();
+        }).catch((error) => {
+            console.log("Error submitting proposal" + error);
+          })
+        });
+
+      }
+  */
+      submitProposal(value){
+        console.log("Inside Submit Proposal");
+        const contract = require('truffle-contract')
+        const signatureWallet = contract(MultiSigContract)
+              signatureWallet.setProvider(this.state.web3.currentProvider)
+    
+        // Call End Contibution
+        this.state.web3.eth.getAccounts((error, accounts) => {
           signatureWallet.defaults({
             from: accounts[0],
             gas: 4712388,
             gasPrice: 100000000000
           });
-
           signatureWallet.deployed().then( (instance) => { 
-            console.log("value in wei", value);    
-             return instance.submitProposal(this.state.web3.toWei(value, 'ether'));
+              return instance.submitProposal(this.state.web3.toWei(value, 'ether'),{from: accounts[0]})
+             //return instance.endContributionPeriod({from: accounts[0]});
             }).then((result) =>{
-             console.log("Called Submit proposal", result);
-             this.displayProposals();
+              this.displayDetails();
+             console.log("Called Successfully Submit Proposal", result); 
         })
         .catch((error) => {
-            console.log("Error submitting proposal" + error);
-          })
-        })
-
-      }
-
+            console.log("error calling submit proposal" + error);
+          });
+      });
+    }
 
       async getProposalDetails(address){
 
@@ -326,9 +400,8 @@ class MultiSigWallet extends Component{
            return instance.approve(proposalAddress, {from: accounts[0]});
           }).then((result) =>{
            console.log("Called Successfully Approve proposal", result); 
-           this.displayProposals();
-      })
-      .catch((error) => {
+          this.displayDetails();      
+        }).catch((error) => {
           console.log("Error approving address" + error);
         })
       })
@@ -352,9 +425,8 @@ class MultiSigWallet extends Component{
            return instance.reject(proposalAddress, {from: accounts[0]});
           }).then((result) =>{
            console.log("Called Successfully Approve proposal", result); 
-           this.displayProposals();
-      })
-      .catch((error) => {
+           this.displayDetails();
+        }).catch((error) => {
           console.log("Error approving address" + error);
         })
       })
@@ -375,22 +447,29 @@ class MultiSigWallet extends Component{
           gasPrice: 100000000000
         });
         signatureWallet.deployed().then( (instance) => {             
-           return instance.withdraw(this.state.web3.toWei(withdrawValue,"ether"), {from: accounts[0]});
+           return instance.withdraw(address, this.state.web3.toWei(withdrawValue,"ether"));
           }).then((result) =>{
            console.log("Called Successfully withdraw proposal", result); 
-           this.displayProposals();
-      })
-      .catch((error) => {
+           this.displayDetails();      
+          }).catch((error) => {
           console.log("Error withdraw proposal" + error);
         })
       })
-
     }
+
+    toggleTabs(type1, type2){
+      //alert(type1, type2);
+      this.setState({ contributionstab: type1, proposalstab: type2 });
+      //this.setState({   });
+
+    } 
 
       render() {
         
+        var totalContrib = 0;
         const {contributorsList, openProposalList, closedProposalList} = this.state;
         const contributorsHTML = contributorsList.map( contributor => {
+          totalContrib += parseInt(contributor.amount);
           return <tr> <td>{contributor.address}</td> 
                 <td><span>{contributor.amount}</span></td></tr> });
 
@@ -399,8 +478,8 @@ class MultiSigWallet extends Component{
                   <td><span>{proposer.ether}</span></td>
                   <td><span>{proposer.approveCount}</span></td>
                   <td><span>{proposer.rejectCount}</span></td>
-                  <td><span><input type="button" value="Approve" onClick={ () => this.approveProposal(proposer.address) }/></span></td>
-                  <td><span><input type="button" value="Reject" onClick={ () => this.rejectProposal(proposer.address) }/></span></td>                </tr>
+                  <td><span><input type="button" class="btn btn-warning"value="Approve" onClick={ () => this.approveProposal(proposer.address) }/></span></td>
+                  <td><span><input type="button" class="btn btn-primary" value="Reject" onClick={ () => this.rejectProposal(proposer.address) }/></span></td>                </tr>
         });
         
         const closedProposalHTML = closedProposalList.map( proposer => {
@@ -423,33 +502,46 @@ class MultiSigWallet extends Component{
         });
         
         return (
-          <div className="MultiSigWallet">
-            Contribution Value(ether): <input type="text" ref="etherValue" /><nbsp /> <input type="button" value="submit" onClick={this.addContributor}/>
+         <div class="container">
+         <h1 className="App-title"> Multi Signature Wallet </h1>
+<ul class="nav nav-tabs" role="tablist">
+  <li class="active"><a href="#contributions" role="tab" data-toggle="tab">Contributions</a></li>
+  <li><a href="#proposals" role="tab" data-toggle="tab">Proposals</a></li>
+</ ul>
+
+<div class="tab-content">
+   <div class="tab-pane active" id="contributions" >
+            <br /> <nbsp />
+            Contribution Value(ether): <input type="text" ref="etherValue" /><nbsp /> <input type="button" value="submit" onClick={this.addContributor} />
             <br /><table border="1">
                 <tr>Contributor Details</tr >
                 <tr> <td>addresses</td> <td> Value</td> </tr>
                 {contributorsHTML}
-                <tr><td> Total Contribution</td> <td>{ this.state.totalContribution}</td> </tr>
+                <tr><td> Total Contribution</td> <td>{totalContrib}</td> </tr>
             </table> <br />
-            <input type="button" value="End Contribution" onClick={this.endContribution} />
+            <input type="button" class="btn btn-success" value="End Contribution" onClick={this.endContribution} />
             <br />
-            <h>Submit Proposals</h> <br />
+            </div>
+   <div class="tab-pane" id="proposals">
+            <label class="label label-primary">Submit Proposals</label> <br />
             Proposer value: <input type="value" ref="proposalValue" />
             <input type="button" value = "Submit Proposal" onClick={ () => this.submitProposal(this.refs.proposalValue.value)} />
             <br />
 
-            <table border ="1">
-              <tr> Open Proposal Details </tr>
+            <table class="table-bordered" border ="1">
+              <label class="label label-primary"> Open Proposal Details </label>
               <tr><td>Proposer Address</td> <td> Proposer Value</td> <td> Approved Count</td> <td>Rejected Count</td></tr>
               {openProposalHTML}
             </table>
 
-            <table border ="1">
-              <tr> Closed Proposal Details </tr>
+            <table class="table-bordered" border ="1">
+            <label class="label label-primary"> Closed Proposal Details </label>
               <tr><td>Proposer Address</td> <td> Actual Proposer Value</td> <td> Available Proposer Value</td> <td> Approved Count</td> <td>Rejected Count</td></tr>
               {closedProposalHTML}
             </table>
-          </div>
+            </div>
+        </div>
+        </div>
         );
     }
 }
