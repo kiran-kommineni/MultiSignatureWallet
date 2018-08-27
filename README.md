@@ -9,10 +9,11 @@
   The proposer can withdraw partial amounts till his withdrawl value is equal to proposed value
 
 -- For Installation run the following steps
-   1) ganache-cli on terminal
+   1) ganache-cli
    2) npm install
    3) truffle compile
    4) truffle migrate --reset --network=development
+   5) truffle test
    5) npm start
   
   
