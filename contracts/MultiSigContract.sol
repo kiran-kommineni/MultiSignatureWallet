@@ -88,7 +88,12 @@ contract MultiSigContract is Pausable {
         require(amountToWithdraw[msg.sender] >= _amountToWithdraw);
         _;
     }
-        
+
+    /**
+    * @dev A function to check if the proposal is closed
+    * @param _beneficiary The address of the proposer
+    * @return boolean Returns true if proposal closed or false if proposal is opened
+    */
     function isProposalClosed(address _beneficiary) public view returns (bool) {
         if(proposals[_beneficiaryProposalIndex[_beneficiary]].rejectedCount > signerCount.div(2)) {
             return true;
@@ -99,11 +104,10 @@ contract MultiSigContract is Pausable {
         return false;     
     }
         
-
-    //function owner() external view returns(address){
-     //   return contractOwner;
-    //}
-
+    /**
+    * @dev Fallback function which gets executed when the called function
+    *      doesnot exist and emits an event
+    */
     function () payable public whenNotPaused acceptContributions {
         require(msg.value > 0);
         contributionsMap[msg.sender] = contributionsMap[msg.sender].add(msg.value);
@@ -120,6 +124,10 @@ contract MultiSigContract is Pausable {
         emit ReceivedContribution(msg.sender, msg.value);
     }
 
+    /**
+    * @dev This function is called to set the contract status to active so that 
+    *      the proposals are made to the contributed amount
+    */
     //function endContributionPeriod() acceptContributions onlySigner external {
     function endContributionPeriod() acceptContributions external {
 
@@ -128,29 +136,56 @@ contract MultiSigContract is Pausable {
         isContractActive = true;
     }
 
+    /**
+    * @dev This function will give us the list of users that contributed
+    *      to the smart contract
+    * @return address[] Returns array of addresses
+    */
     function listContributors() external view returns (address[]) {
         return contributorsList;
     }
 
+    /**
+    * @dev This function will return contributed amount in wei by each user
+    * @param _contributor Address of the contributor
+    * @return address Address of the contributor
+    * @return Amount contributed in wei
+    */
     function getContributorAmount(address _contributor) external view returns (address, uint) {
         return (_contributor, contributionsMap[_contributor]);
     }
 
+    /**
+    * @dev Will return the status of the contract
+    * @return boolean Will return true or false based on the contract
+    */
     function getContractStatus() external view returns (bool) {
         return isContractActive;
     }
 
+    /**
+    * @dev Will return the contributions in total
+    * @return int Returns the total contributions in wei
+    */
     function getTotalContributions() external view returns (uint) {
         return totalContributions;
     }
 
+    /**
+    * @dev This function accepts a proposal based on the modifier conditions met
+    * @param _valueInWei is the value proposed by the proposer
+     */
     function submitProposal(uint _valueInWei) external payable whenNotPaused onlyifContractStatusActive onlyIfNoOpenProposal onlyIfValueAllowed(_valueInWei) {
         proposals.push(Proposal(_valueInWei, msg.sender, 0, 0));
         _beneficiaryProposalIndex[msg.sender] = proposals.length - 1;
         availableContributions = availableContributions.sub(_valueInWei);
         emit ProposalSubmitted(msg.sender, _valueInWei);
     }
-        
+    
+    /**
+    * @dev This function is responsible to approve a proposal
+    * @param _beneficiary The address of the proposal whose approval count increased by 1
+     */
     //function approve(address _beneficiary) external onlyifContractStatusActive onlySigner onlyIfNotVoted(_beneficiary) {
     function approve(address _beneficiary) external{
         Proposal storage p = proposals[_beneficiaryProposalIndex[_beneficiary]];
@@ -162,7 +197,11 @@ contract MultiSigContract is Pausable {
         }
         emit ProposalApproved(msg.sender, _beneficiary, p._valueInWei);
     } 
-        
+
+     /**
+    * @dev This function is responsible to reject a proposal
+    * @param _beneficiary The address of the proposal whose reject count increased by 1
+     */       
     //function reject(address _beneficiary) external onlyifContractStatusActive onlySigner onlyIfNotVoted(_beneficiary) {
     function reject(address _beneficiary) external {  
         Proposal storage p = proposals[_beneficiaryProposalIndex[_beneficiary]];
@@ -175,16 +214,32 @@ contract MultiSigContract is Pausable {
         emit ProposalRejected(msg.sender, _beneficiary, p._valueInWei);
     }
     
+    /**
+    * @dev This function will withdraw ether from contact and transfer it to proposer
+    * @param beneficiary The address to which ether needs to be transferred
+    * @param _valueInWei The amount that needs to be transferred to intended account
+     */
     function withdraw(address beneficiary, uint _valueInWei) external whenNotPaused onlyifContractStatusActive onlyIfWithdrawable(_valueInWei) {
         amountToWithdraw[msg.sender] = amountToWithdraw[msg.sender].sub(_valueInWei);        
         beneficiary.transfer(_valueInWei);
         emit WithdrawPerformed(beneficiary, _valueInWei);
     }
-        
+
+    /**
+    * @dev This function will return no of votes signed against the beneficiary
+    * @param _signer "The address of the signer who approved the contract"
+    * @param _beneficiary "The address of the proposer whose proposal is signed"
+    * @return _int   "The no of votes signed"
+     */
+
     function getSignerVote(address _signer, address _beneficiary) view external returns(uint) {
         return proposals[_beneficiaryProposalIndex[_beneficiary]].sigatures[_signer];
     }
 
+    /**
+    * @dev The function will list the beneficiary proposals made till date
+    * @return Will return the array of addresses
+     */
     function listOpenBeneficiariesProposals() external view returns (address[]) {
         address[] memory openBeneficiaries = new address[](proposals.length);
         uint j = 0;
@@ -204,11 +259,24 @@ contract MultiSigContract is Pausable {
         return openBeneficiariesActual;
     }
 
+    /**
+    * @dev This function will return the value of the proposal made
+    * @param address "will take address as the parameter" 
+    * @return uint "will return the value in wei"
+     */
     function getBeneficiaryProposal(address _beneficiary) external view returns (uint) {
         return proposals[_beneficiaryProposalIndex[_beneficiary]]._valueInWei;
     }
 
-    //Added toget Details
+    /**
+    * @dev This function will return the proposal details 
+    * @param proposerAddress Address of the details needed
+    * @return address "Address of the proposer"
+    * @return _valueInWei "The value in wei that is proposed"
+    * @return approvalCount "The no of approvals received till date"
+    * @return rejectedCount "The no of rejections received till date"
+    * @return withdrawnAmount "The amount that is withdrawn till date by the proposer"
+     */
     function getProposalDetails(address proposerAddress) external view 
         returns(address, uint,uint,uint,uint){
 
@@ -217,7 +285,11 @@ contract MultiSigContract is Pausable {
         return (proposerAddress, p._valueInWei, p.approvalCount, p.rejectedCount, amountToWithdraw[msg.sender]);
     }
 
-    
+    /**
+    * @dev Returns the list of proposals made till date
+    * @return Open proposal addresses are returned
+    * @return Closed proposal addresses are returned
+     */
     function getProposalAddressList() external view returns(address[], address[]){
         address[] memory openBeneficiaries = new address[](proposals.length);
         address[] memory closedBeneficiaries = new address[](proposals.length);
@@ -239,6 +311,16 @@ contract MultiSigContract is Pausable {
         }
 
         return (openBeneficiaries, closedBeneficiaries);
+    }
+
+    /**
+    * @dev A function which can only be called by the owner and will release a negative gas
+    *      when the contract have to be decomissioned.
+    */
+    function kill() public {
+        if(msg.sender == owner){
+            selfdestruct(owner);
+        }
     }
 }
 
