@@ -1,6 +1,14 @@
 pragma solidity ^0.4.20;
 
-contract MultiSigContract {
+import "openzeppelin-solidity/contracts/lifecycle/Pausable.sol";
+
+/** @title MultiSignatureWallet */
+/**
+ *     A MultiSignaturewallet responsbile for holding ether funded
+ *     by the contributors and dispurse ether for proposers
+ *     based on enough approval count
+ */
+contract MultiSigContract is Pausable {
     using SafeMath for uint256;
 
     // Variables
@@ -30,19 +38,9 @@ contract MultiSigContract {
     // Constructor
     constructor()  public { 
         /*       
-        signerList[0xfa3c6a1d480a14c546f12cdbb6d1bacbf02a1610] = true;
-        signerList[0x2f47343208d8db38a64f49d7384ce70367fc98c0] = true;
-        signerList[0x7c0e7b2418141f492653c6bf9ced144c338ba740] = true;
-        //signerList[0x391a861a4049a3f55c8a9260fa9ec2089157559b] = true;
-        //signerList[0x0523475fdd073de39148830c25c936252f611679] = true;
-        //signerList[0xf6e793afdfbe34e57e783352d1e046ad74db9fa1] = true;
-        proposals.push(Proposal(10000000000000000000, 0x4a321b274338988d8ae5ea794ac1d5999f042002, 1, 2));
-        proposals.push(Proposal(3000000000000000000, 0x57913bb2e7d6feaf3aae607875d44a0d744fa8b9, 2, 0));
-        proposals.push(Proposal(6000000000000000000, 0xa04dad4445126b79aaaae2f4d0201749945ff3e2, 0, 0));
         _beneficiaryProposalIndex[0x4a321b274338988d8ae5ea794ac1d5999f042002] = 0;
         _beneficiaryProposalIndex[0x57913bb2e7d6feaf3aae607875d44a0d744fa8b9] = 1;
         _beneficiaryProposalIndex[0xa04dad4445126b79aaaae2f4d0201749945ff3e2] = 2;
-
         signerCount = signerCount.add(3);
         */  
     }
@@ -102,11 +100,11 @@ contract MultiSigContract {
     }
         
 
-    function owner() external view returns(address){
-        return contractOwner;
-    }
+    //function owner() external view returns(address){
+     //   return contractOwner;
+    //}
 
-    function () payable public acceptContributions {
+    function () payable public whenNotPaused acceptContributions {
         require(msg.value > 0);
         contributionsMap[msg.sender] = contributionsMap[msg.sender].add(msg.value);
         totalContributions = totalContributions.add(msg.value);
@@ -146,7 +144,7 @@ contract MultiSigContract {
         return totalContributions;
     }
 
-    function submitProposal(uint _valueInWei) external payable onlyifContractStatusActive onlyIfNoOpenProposal onlyIfValueAllowed(_valueInWei) {
+    function submitProposal(uint _valueInWei) external payable whenNotPaused onlyifContractStatusActive onlyIfNoOpenProposal onlyIfValueAllowed(_valueInWei) {
         proposals.push(Proposal(_valueInWei, msg.sender, 0, 0));
         _beneficiaryProposalIndex[msg.sender] = proposals.length - 1;
         availableContributions = availableContributions.sub(_valueInWei);
@@ -163,7 +161,7 @@ contract MultiSigContract {
             amountToWithdraw[_beneficiary] = amountToWithdraw[_beneficiary].add(p._valueInWei);
         }
         emit ProposalApproved(msg.sender, _beneficiary, p._valueInWei);
-    }
+    } 
         
     //function reject(address _beneficiary) external onlyifContractStatusActive onlySigner onlyIfNotVoted(_beneficiary) {
     function reject(address _beneficiary) external {  
@@ -177,7 +175,7 @@ contract MultiSigContract {
         emit ProposalRejected(msg.sender, _beneficiary, p._valueInWei);
     }
     
-    function withdraw(address beneficiary, uint _valueInWei) external onlyifContractStatusActive onlyIfWithdrawable(_valueInWei) {
+    function withdraw(address beneficiary, uint _valueInWei) external whenNotPaused onlyifContractStatusActive onlyIfWithdrawable(_valueInWei) {
         amountToWithdraw[msg.sender] = amountToWithdraw[msg.sender].sub(_valueInWei);        
         beneficiary.transfer(_valueInWei);
         emit WithdrawPerformed(beneficiary, _valueInWei);

@@ -2,6 +2,12 @@ import "bootstrap/dist/css/bootstrap.min.css"
 import React, { Component } from 'react'
 import MultiSigContract from '../contracts/MultiSigContract.json'
 
+/**
+ * @title:
+ *     A MultiSignaturewallet responsbile for holding ether funded
+ *     by the contributors and dispurse ether for proposers
+ *     based on enough approval count
+ */
 class MultiSigWallet extends Component{
     constructor(props) {
         super(props);
@@ -26,9 +32,9 @@ class MultiSigWallet extends Component{
         this.displayProposals = this.displayProposals.bind(this);
         this.approveProposal = this.approveProposal.bind(this);
         this.rejectProposal = this.rejectProposal.bind(this);
-        //this.txReceipt = this.txReceipt.bind(this);
       }
 
+      //Make sure that the web3 component is initialised with metamask 
       componentWillMount() {
         this.setState({web3: window.web3})
       }
@@ -67,7 +73,10 @@ class MultiSigWallet extends Component{
         }
     }
 
-
+      /**
+       * @dev Will send ether the smart contract and the contributor details
+       *      are captured
+       */
       addContributor(){
         console.log("Inside Add contributor");
         const contract = require('truffle-contract')
@@ -98,6 +107,10 @@ class MultiSigWallet extends Component{
         });
       }
 
+      /**
+       * @dev Afunction responsible to display contributors tab in ui
+       * @param {*} asyncAfterFunction display proposers details asynchronously
+       */
       displayContributors(asyncAfterFunction) {
 
         console.log("Inside Display contributors");
@@ -147,7 +160,10 @@ class MultiSigWallet extends Component{
         });
 
       }
-
+       /**
+       * @dev Afunction responsible to display proposals tab in ui
+       * @param {*} asyncAfterFunction display proposers details asynchronously
+       */
       displayProposals(otherState={}) {
 
         console.log("contributors:: ", otherState);
@@ -225,7 +241,11 @@ class MultiSigWallet extends Component{
 
       }
       
-
+      
+      /**
+       * @dev Retrivies individual contributor amounts
+       * @param address Address of the contributor
+       */
       async getContributorAmount(address){
         const refreshContributorValueDisplay = this.refreshContributorValueDisplay;
         console.log("inside get contributor");
@@ -255,16 +275,25 @@ class MultiSigWallet extends Component{
       this.setState({contributorsList: address.map((e) => {return {address: e, value: addrValue[e] }; } )});
     }
     
-
-      refreshContributorValueDisplay(address, value) {
+    /**
+     * @dev Whenever a addContribution function is called this function is called
+     *      internally to refresh details in ui
+     * @param {*} address Address of the contributor
+     * @param {*} value   Value in ether contributed
+     */
+    refreshContributorValueDisplay(address, value) {
         const {contributorsList} = this.state;
         console.log(this.state.web3.fromWei(value, 'ether'));
         this.setState({contributorsList: contributorsList.map((e) => {
           return {address: e.address, value: (e.address === address ? this.state.web3.fromWei(value, 'ether').toString() : e.value)};
         })});
-      }
+    }
 
-      endContribution(){
+    /**
+     * @dev This function when called sets the contract state to true so that
+     *      Proposers can start proposing their funding amount needed
+     */
+    endContribution(){
         console.log("Inside End Contribution");
         const contract = require('truffle-contract')
         const signatureWallet = contract(MultiSigContract)
@@ -287,39 +316,14 @@ class MultiSigWallet extends Component{
           })
         })
 
-      }
+    }
 
-      /*
-      submitProposal1(value){
- 
-        console.log("Inside Submit Proposal", value);
-        const contract = require('truffle-contract')
-        const signatureWallet = contract(MultiSigContract)
-              signatureWallet.setProvider(this.state.web3.currentProvider)
-
-        // Call End Contibution
-        this.state.web3.eth.getAccounts((error, accounts) => {
-          signatureWallet.deployed().then( (instance) => { 
-            console.log("value in wei", value);    
-             //return instance.submitProposal(this.state.web3.toWei(value, 'ether'));
-             return instance.sendTransaction({
-              from: accounts[0],
-              data: instance.submitProposal(this.state.web3.toWei(value, 'ether')),
-              gas: 4712388,
-              gasPrice: 100000000000,
-              value:
-            });
-          }).then((result) => {
-            console.log("completed proposal");
-            this.displayDetails();
-        }).catch((error) => {
-            console.log("Error submitting proposal" + error);
-          })
-        });
-
-      }
-  */
-      submitProposal(value){
+    /**
+     * @Dev One the contract is active this function will submit a proposal
+     *      and wait for the approval status
+     * @param {*} value Amount of ether which should not exceed 10% of total contribution
+     */
+    submitProposal(value){
         console.log("Inside Submit Proposal");
         const contract = require('truffle-contract')
         const signatureWallet = contract(MultiSigContract)
@@ -345,7 +349,12 @@ class MultiSigWallet extends Component{
       });
     }
 
-      async getProposalDetails(address){
+    /**
+     * @Dev Will return the proposal details based on the given address
+     * @param {*} address 
+     * @returns 
+     */
+    async getProposalDetails(address){
 
         console.log("inside proposal details");
         const contract = require('truffle-contract')
@@ -381,6 +390,10 @@ class MultiSigWallet extends Component{
       this.setState({openProposalList: address.map((e) => {return {address: e, ether: addrValue[e][0], appCount:addrValue[e][1],rejCount:addrValue[e][2] }; } )});
     }
 
+    /**
+     * @dev The active account owner will approve the proposal
+     * @param {*} proposalAddress Address of the proposal to be approved
+     */
     approveProposal(proposalAddress){
       console.log("Inside Approve proposal");
       const contract = require('truffle-contract')
@@ -406,6 +419,10 @@ class MultiSigWallet extends Component{
 
     }
 
+    /**
+     * @dev The active account owner will reject the proposal
+     * @param {*} proposalAddress Address of the proposal to be rejected
+     */
     rejectProposal(proposalAddress){
       console.log("Inside Approve proposal");
       const contract = require('truffle-contract')
@@ -431,6 +448,12 @@ class MultiSigWallet extends Component{
 
     }
 
+    /**
+     * @dev A function to tranfer value to the proposer for his
+     *      project needs
+     * @param {*} address 
+     * @param {*} withdrawValue 
+     */
     withdrawProposalValue(address, withdrawValue){
       console.log("Inside withdrawProposalValue");
       const contract = require('truffle-contract')
@@ -456,10 +479,7 @@ class MultiSigWallet extends Component{
     }
 
     toggleTabs(type1, type2){
-      //alert(type1, type2);
       this.setState({ contributionstab: type1, proposalstab: type2 });
-      //this.setState({   });
-
     } 
 
       render() {

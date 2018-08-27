@@ -92,9 +92,4 @@ contract('MultiSigWallet', function(accounts) {
     })
   });
 
-
-
-
-
-
 });
