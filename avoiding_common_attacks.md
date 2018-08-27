@@ -6,3 +6,5 @@ Security practices
 2) We have made sure that the vaiables like contibutions and proposals are kept private and specified function modifiers where ever necessary so that there is a control mechanism.
 
 3) Access specifiers like 'external', 'view' are specified to functions where ever necessary so that we restrict access to specified function callers.
+
+4) Transfer or send functions are specified in the last to eliminate race around conditions which might happen similar to DAO hack
